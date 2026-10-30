@@ -1,0 +1,76 @@
+openapi: 3.0.3
+info:
+  title: ConnectHub API
+  version: 1.0.0
+  description: |
+    Contrato público do serviço. A futura implementação em Java (Spring Boot) deve respeitar este contrato
+    para que o front-end continue funcionando sem alterações. Autenticação: `Authorization: Bearer <token>`.
+    Erros: `{ "error": "mensagem", "details": { "campo": "mensagem" } }`.
+servers:
+  - url: http://localhost:3000
+paths:
+  /api/health: { get: { summary: Health check, responses: { '200': { description: '{ "status": "ok" }' } } } }
+  /api/meta:
+    get: { summary: Cursos, anos, tags e habilidades existentes, responses: { '200': { description: Meta, content: { application/json: { schema: { $ref: '#/components/schemas/Meta' } } } } } }
+  /api/auth/register:
+    post:
+      summary: Cria conta
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Registration' } } } }
+      responses: { '201': { description: Sessão, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }, '400': { description: Validação }, '409': { description: E-mail já cadastrado } }
+  /api/auth/login:
+    post:
+      summary: Login
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [email, password], properties: { email: { type: string }, password: { type: string } } } } } }
+      responses: { '200': { description: Sessão, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }, '401': { description: Credenciais inválidas }, '429': { description: Muitas tentativas } }
+  /api/auth/me:
+    get: { summary: Usuário logado, security: [{ bearer: [] }], responses: { '200': { description: Usuário, content: { application/json: { schema: { $ref: '#/components/schemas/Self' } } } }, '401': { description: Não autenticado } } }
+  /api/projects:
+    get:
+      summary: Lista projetos (mais recentes primeiro)
+      parameters:
+        - { name: q, in: query, schema: { type: string }, description: Busca em título, resumo, tags, curso e autores }
+        - { name: course, in: query, schema: { type: string } }
+        - { name: tag, in: query, schema: { type: string } }
+        - { name: featured, in: query, schema: { type: string }, description: Qualquer valor não vazio filtra destaques }
+      responses: { '200': { description: Lista, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Project' } } } } } }
+    post:
+      summary: Publica projeto (o autor é o usuário logado)
+      security: [{ bearer: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProjectInput' } } } }
+      responses: { '201': { description: Criado, content: { application/json: { schema: { $ref: '#/components/schemas/Project' } } } }, '400': { description: Validação }, '401': { description: Não autenticado } }
+  /api/projects/{slug}:
+    parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
+    get: { summary: Detalhe do projeto, responses: { '200': { description: Projeto, content: { application/json: { schema: { $ref: '#/components/schemas/Project' } } } }, '404': { description: Não encontrado } } }
+    delete: { summary: Exclui projeto (somente autores), security: [{ bearer: [] }], responses: { '204': { description: Excluído }, '403': { description: Não é autor }, '404': { description: Não encontrado } } }
+  /api/projects/{slug}/like:
+    post:
+      summary: Alterna curtida do usuário logado
+      security: [{ bearer: [] }]
+      parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: Projeto atualizado, content: { application/json: { schema: { $ref: '#/components/schemas/Project' } } } } }
+  /api/members:
+    get:
+      summary: Lista membros
+      parameters: [{ name: q, in: query, schema: { type: string } }, { name: course, in: query, schema: { type: string } }, { name: skill, in: query, schema: { type: string } }]
+      responses: { '200': { description: Lista, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Member' } } } } } }
+  /api/members/{slug}:
+    get:
+      summary: Perfil de um membro com seus projetos
+      parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: Membro }, '404': { description: Não encontrado } }
+  /api/profile:
+    put:
+      summary: Atualiza o próprio perfil
+      security: [{ bearer: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { bio: { type: string, maxLength: 300 }, skills: { type: string, description: 'Separadas por vírgula (ou array)' }, course: { type: string }, year: { type: string } } } } } }
+      responses: { '200': { description: Usuário atualizado, content: { application/json: { schema: { $ref: '#/components/schemas/Self' } } } } }
+components:
+  securitySchemes: { bearer: { type: http, scheme: bearer } }
+  schemas:
+    Meta: { type: object, properties: { courses: { type: array, items: { type: string } }, years: { type: array, items: { type: string } }, tags: { type: array, items: { type: string } }, skills: { type: array, items: { type: string } } } }
+    Registration: { type: object, required: [name, email, password, course, year], properties: { name: { type: string }, email: { type: string }, password: { type: string, minLength: 8 }, course: { type: string }, year: { type: string }, skills: { type: string } } }
+    Member: { type: object, properties: { id: { type: string, format: uuid }, slug: { type: string }, name: { type: string }, course: { type: string }, year: { type: string }, bio: { type: string }, skills: { type: array, items: { type: string } }, createdAt: { type: string, format: date-time }, projectCount: { type: integer } } }
+    Self: { allOf: [{ $ref: '#/components/schemas/Member' }, { type: object, properties: { email: { type: string } } }] }
+    Session: { type: object, properties: { token: { type: string }, user: { $ref: '#/components/schemas/Self' } } }
+    ProjectInput: { type: object, required: [title, summary, course, year], properties: { title: { type: string, minLength: 3, maxLength: 80 }, subtitle: { type: string, maxLength: 120 }, summary: { type: string, minLength: 10, maxLength: 300 }, description: { type: string, maxLength: 4000 }, course: { type: string }, year: { type: string }, tags: { type: string, description: 'Separadas por vírgula (máx. 8)' }, link: { type: string, format: uri } } }
+    Project: { type: object, properties: { id: { type: string, format: uuid }, slug: { type: string }, title: { type: string }, subtitle: { type: string }, summary: { type: string }, description: { type: string }, course: { type: string }, year: { type: string }, tags: { type: array, items: { type: string } }, link: { type: string }, featured: { type: boolean }, hue: { type: integer }, likes: { type: integer }, liked: { type: boolean }, authors: { type: array, items: { $ref: '#/components/schemas/Member' } }, createdAt: { type: string, format: date-time } } }

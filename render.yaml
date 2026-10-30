@@ -1,0 +1,18 @@
+# Blueprint do Render: cria o serviço da API a partir do Dockerfile.
+services:
+  - type: web
+    name: connecthub-api
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: DATABASE_URL       # cole a connection string do Neon
+        sync: false
+      - key: ALLOWED_ORIGINS    # URL do front-end (ex.: https://connecthub.vercel.app)
+        sync: false
+      - key: SEED_DEMO
+        value: "true"

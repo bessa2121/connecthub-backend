@@ -1,41 +1,50 @@
-# ConnectHub Web
+# ConnectHub API
 
-Front-end do ConnectHub (ETEC Camargo Aranha): SPA em JavaScript puro (ES Modules), **sem dependências e sem framework**.
-Consome a API definida em `connecthub-api/docs/openapi.yaml` — por isso continua funcionando quando o back-end migrar para Java.
+Serviço de back-end do ConnectHub (ETEC Camargo Aranha): autenticação, projetos, comunidade e talentos.
+Node.js 20+ · PostgreSQL · Clean Architecture · contrato em `docs/openapi.yaml`.
 
 ## Rodar localmente
 
 ```bash
-# 1) suba a API (connecthub-api) em http://localhost:3000
-npm run dev                       # http://localhost:5173
-API_URL=https://minha-api.onrender.com npm run dev    # apontando para outra API
+npm install
+cp .env.example .env     # opcional; sem DATABASE_URL usa memória
+npm run dev              # http://localhost:3000
+npm test                 # testes em memória
+TEST_DATABASE_URL=postgres://user:senha@localhost:5432/teste npm test   # mesma suíte em PostgreSQL
 ```
 
-## Build
+Com `SEED_DEMO=true`, cria alunos e projetos de exemplo (login `lucas@exemplo.com` / `connecthub123`).
 
-```bash
-API_URL=https://sua-api.onrender.com npm run build    # gera dist/ (config.js + _redirects incluídos)
-npm start                                             # serve dist/ localmente para conferir
-```
-
-## Estrutura
+## Arquitetura
 
 ```
 src/
-├─ index.html · config.js (gerado) · css/styles.css · favicon.svg
-└─ js/
-   ├─ main.js           rotas da aplicação
-   ├─ router.js         roteador SPA (History API)
-   ├─ services/         api.js (HTTP), session.js (login)
-   ├─ components/       layout, cards, formulários, toasts
-   ├─ pages/            home, projetos, comunidade, auth, estáticas
-   └─ lib/html.js       template literal com escape automático (anti-XSS)
-scripts/                build.mjs, dev-server.mjs
+├─ domain/          entidades, regras e validações puras (sem dependências)
+├─ application/     casos de uso: auth, projetos, comunidade
+├─ infrastructure/  config, hash scrypt, token HMAC, seed e persistência
+│  └─ persistence/  memory/ e postgres/ (mesma interface — "ports & adapters")
+├─ presentation/http/  router, rotas, servidor, CORS e rate limit
+└─ main.js          composition root
+docs/openapi.yaml   contrato da API
 ```
 
-## Paleta
+## Migração futura para Java
 
-Azul `#1f4bd8` + vermelho `#e0243f` que se fundem no roxo `#7a3bd6` — as cores da ETEC Camargo Aranha e da tecnologia.
-Tokens em `:root` de `src/css/styles.css` (`--blue`, `--purple`, `--red`, `--grad`). Suporta tema escuro automático.
+1. Implemente o contrato `docs/openapi.yaml` (ex.: Spring Boot + Spring Data JPA).
+2. O esquema SQL está em `src/infrastructure/persistence/postgres/schema.js` — converta para Flyway/Liquibase.
+   O mesmo banco PostgreSQL continua funcionando (UUIDs, `text[]`), então os dados migram sem conversão.
+3. Senhas usam scrypt (`salt:hash`, 64 bytes); para manter logins, reimplemente a verificação em Java
+   (ou force redefinição de senha). Tokens são HMAC-SHA256 próprios — no Java use JWT e atualize o front.
+4. Aponte `API_URL` do front-end para o novo serviço. Nada mais muda no front.
+
+## Variáveis de ambiente
+
+| Variável | Descrição |
+|---|---|
+| `PORT` | Porta HTTP (padrão 3000) |
+| `AUTH_SECRET` | Segredo dos tokens — **obrigatório em produção** |
+| `DATABASE_URL` | Conexão PostgreSQL. Vazio = memória |
+| `ALLOWED_ORIGINS` | Sites autorizados (CORS), separados por vírgula |
+| `SEED_DEMO` | `true` cria dados de demonstração se o banco estiver vazio |
 
 Deploy: veja **DEPLOY.md**.

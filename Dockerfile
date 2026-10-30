@@ -1,14 +1,11 @@
-# Build estático + nginx. Uso: docker build --build-arg API_URL=https://sua-api.onrender.com -t connecthub-web .
-FROM node:22-alpine AS build
+FROM node:22-alpine
 WORKDIR /app
-ARG API_URL
-ENV API_URL=$API_URL
-COPY package.json ./
-COPY scripts ./scripts
+ENV NODE_ENV=production
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 COPY src ./src
-RUN node scripts/build.mjs
-
-FROM nginx:1.27-alpine
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 80
+COPY docs ./docs
+USER node
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://localhost:${PORT:-3000}/api/health || exit 1
+CMD ["node", "src/main.js"]

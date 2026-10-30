@@ -1,13 +1,15 @@
 {
-  "name": "connecthub-web",
+  "name": "connecthub-api",
   "version": "1.0.0",
-  "description": "ConnectHub Web — front-end estático (SPA) da ETEC Camargo Aranha",
-  "private": true,
+  "description": "ConnectHub API — serviço de projetos, comunidade e autenticação da ETEC Camargo Aranha",
   "type": "module",
+  "main": "src/main.js",
   "scripts": {
-    "dev": "node scripts/dev-server.mjs",
-    "build": "node scripts/build.mjs",
-    "start": "node scripts/dev-server.mjs dist"
+    "start": "node src/main.js",
+    "dev": "node --watch src/main.js",
+    "test": "node --test"
   },
-  "engines": { "node": ">=18" }
+  "engines": { "node": ">=20" },
+  "dependencies": { "pg": "^8.13.1" },
+  "license": "MIT"
 }
