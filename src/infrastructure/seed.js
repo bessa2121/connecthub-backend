@@ -8,7 +8,7 @@ export async function seedDemo({ users, projects }) {
   const passwordHash = passwordHasher.hash('connecthub123');
   const mk = (name, course, year, bio, skills) => ({
     id: randomUUID(), slug: slugify(name), name, email: `${slugify(name).split('-')[0]}@exemplo.com`,
-    passwordHash, course, year, bio, skills, createdAt: '2026-05-10T12:00:00.000Z',
+    passwordHash, course, year, bio, skills, avatar: '', instagram: '', linkedin: '', contactEmail: '', createdAt: '2026-05-10T12:00:00.000Z',
   });
   const [lucas, beatriz, mariana, rafael, joao, ana, camila] = [
     mk('Lucas Almeida', 'Desenvolvimento de Sistemas', '3º ano', 'Apaixonado por interfaces e por resolver problemas reais da escola.', ['React', 'JavaScript', 'Banco de Dados']),
@@ -21,7 +21,7 @@ export async function seedDemo({ users, projects }) {
   ];
   for (const u of [lucas, beatriz, mariana, rafael, joao, ana, camila]) await users.add(u);
   const project = (slug, title, subtitle, summary, course, year, tags, authors, hue, createdAt, featured, description) =>
-    ({ id: randomUUID(), slug, title, subtitle, summary, description, course, year, tags, link: '', authorIds: authors.map((a) => a.id), likes: [], featured, hue, createdAt });
+    ({ id: randomUUID(), slug, title, subtitle, summary, description, course, year, tags, link: '', image: '', authorIds: authors.map((a) => a.id), likes: [], featured, hue, createdAt });
   const list = [
     project('agenda-etec', 'Agenda ETEC', 'Organização escolar em um só lugar', 'Sistema web para alunos acompanharem provas, entregas e avisos das turmas, com lembretes automáticos.', 'Desenvolvimento de Sistemas', '3º ano', ['Tecnologia', 'Inovação', 'React', 'JavaScript', 'Banco de Dados'], [lucas, beatriz], 230, '2026-09-18T12:00:00.000Z', true, 'A Agenda ETEC nasceu da dificuldade de acompanhar prazos em vários grupos de mensagens. O sistema centraliza provas, trabalhos e avisos por turma e envia lembretes automáticos.\n\nO projeto foi desenvolvido em React com API própria e banco de dados relacional.'),
     project('campanha-orbit', 'Campanha Energia Jovem', 'Lançamento fictício de bebida para o público universitário', 'Campanha publicitária completa com pesquisa de público, identidade visual, peças impressas e plano para redes sociais.', 'Marketing', '2º ano', ['Comunicação', 'Design', 'Publicidade', 'Marketing Digital', 'Design Gráfico'], [mariana, rafael], 330, '2026-08-30T12:00:00.000Z', true, 'Da pesquisa de público ao plano de redes sociais, a equipe construiu uma campanha completa para uma marca fictícia de bebida energética.'),

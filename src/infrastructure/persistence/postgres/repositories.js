@@ -2,8 +2,9 @@ import pg from 'pg';
 import { ConflictError } from '../../../domain/errors.js';
 import { SCHEMA } from './schema.js';
 
-const USER = `id::text AS id, slug, name, email, password_hash AS "passwordHash", course, year, bio, skills, created_at AS "createdAt"`;
-const PROJECT = `SELECT p.id::text AS id, p.slug, p.title, p.subtitle, p.summary, p.description, p.course, p.year, p.tags, p.link,
+const USER = `id::text AS id, slug, name, email, password_hash AS "passwordHash", course, year, bio, skills,
+  avatar, instagram, linkedin, contact_email AS "contactEmail", created_at AS "createdAt"`;
+const PROJECT = `SELECT p.id::text AS id, p.slug, p.title, p.subtitle, p.summary, p.description, p.course, p.year, p.tags, p.link, p.image,
   p.featured, p.hue, p.created_at AS "createdAt",
   COALESCE((SELECT array_agg(a.user_id::text ORDER BY a.position) FROM project_authors a WHERE a.project_id = p.id), '{}'::text[]) AS "authorIds",
   COALESCE((SELECT array_agg(l.user_id::text) FROM project_likes l WHERE l.project_id = p.id), '{}'::text[]) AS likes
@@ -24,14 +25,17 @@ export function createPostgresPersistence(connectionString) {
     findByIds: async (ids) => (ids.length ? many(`SELECT ${USER} FROM users WHERE id = ANY($1::uuid[])`, [ids]) : []),
     findByEmail: (email) => one(`SELECT ${USER} FROM users WHERE email = $1`, [email]),
     findBySlug: (slug) => one(`SELECT ${USER} FROM users WHERE slug = $1`, [slug]),
+    slugExists: async (slug) => (await q('SELECT 1 FROM users WHERE slug = $1', [slug])).rowCount > 0,
     async add(u) {
       try {
-        await q(`INSERT INTO users (id, slug, name, email, password_hash, course, year, bio, skills, created_at)
-                 VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9::text[],$10)`,
-          [u.id, u.slug, u.name, u.email, u.passwordHash, u.course, u.year, u.bio, u.skills, u.createdAt]);
+        await q(`INSERT INTO users (id, slug, name, email, password_hash, course, year, bio, skills, avatar, instagram, linkedin, contact_email, created_at)
+                 VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9::text[],$10,$11,$12,$13,$14)`,
+          [u.id, u.slug, u.name, u.email, u.passwordHash, u.course, u.year, u.bio, u.skills,
+           u.avatar ?? '', u.instagram ?? '', u.linkedin ?? '', u.contactEmail ?? '', u.createdAt]);
       } catch (e) { if (e.code === '23505') throw new ConflictError('Este e-mail já está cadastrado.'); throw e; }
     },
-    update: (u) => q('UPDATE users SET bio=$2, skills=$3::text[], course=$4, year=$5 WHERE id=$1::uuid', [u.id, u.bio, u.skills, u.course, u.year]),
+    update: (u) => q(`UPDATE users SET bio=$2, skills=$3::text[], course=$4, year=$5, avatar=$6, instagram=$7, linkedin=$8, contact_email=$9
+                      WHERE id=$1::uuid`, [u.id, u.bio, u.skills, u.course, u.year, u.avatar ?? '', u.instagram ?? '', u.linkedin ?? '', u.contactEmail ?? '']),
     allSkills: async () => (await q('SELECT DISTINCT unnest(skills) AS s FROM users')).rows.map((r) => r.s),
   };
 
@@ -39,14 +43,15 @@ export function createPostgresPersistence(connectionString) {
     all: () => many(`${PROJECT} ORDER BY p.created_at DESC`),
     count: async () => (await q('SELECT count(*)::int AS n FROM projects')).rows[0].n,
     findBySlug: (slug) => one(`${PROJECT} WHERE p.slug = $1`, [slug]),
+    slugExists: async (slug) => (await q('SELECT 1 FROM projects WHERE slug = $1', [slug])).rowCount > 0,
     findByAuthor: (userId) => many(`${PROJECT} WHERE EXISTS (SELECT 1 FROM project_authors a WHERE a.project_id = p.id AND a.user_id = $1::uuid) ORDER BY p.created_at DESC`, [userId]),
     async add(p) {
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
-        await client.query(`INSERT INTO projects (id, slug, title, subtitle, summary, description, course, year, tags, link, featured, hue, created_at)
-          VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9::text[],$10,$11,$12,$13)`,
-          [p.id, p.slug, p.title, p.subtitle, p.summary, p.description, p.course, p.year, p.tags, p.link, p.featured, p.hue, p.createdAt]);
+        await client.query(`INSERT INTO projects (id, slug, title, subtitle, summary, description, course, year, tags, link, image, featured, hue, created_at)
+          VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9::text[],$10,$11,$12,$13,$14)`,
+          [p.id, p.slug, p.title, p.subtitle, p.summary, p.description, p.course, p.year, p.tags, p.link, p.image ?? '', p.featured, p.hue, p.createdAt]);
         for (const [i, userId] of p.authorIds.entries())
           await client.query('INSERT INTO project_authors (project_id, user_id, position) VALUES ($1::uuid,$2::uuid,$3)', [p.id, userId, i]);
         await client.query('COMMIT');
@@ -56,6 +61,8 @@ export function createPostgresPersistence(connectionString) {
         throw e;
       } finally { client.release(); }
     },
+    update: (p) => q(`UPDATE projects SET title=$2, subtitle=$3, summary=$4, description=$5, course=$6, year=$7, tags=$8::text[], link=$9, image=$10
+                      WHERE id=$1::uuid`, [p.id, p.title, p.subtitle, p.summary, p.description, p.course, p.year, p.tags, p.link, p.image ?? '']),
     remove: (id) => q('DELETE FROM projects WHERE id = $1::uuid', [id]),
     async toggleLike(id, userId) {
       const del = await q('DELETE FROM project_likes WHERE project_id=$1::uuid AND user_id=$2::uuid', [id, userId]);
@@ -68,10 +75,18 @@ export function createPostgresPersistence(connectionString) {
     allTags: async () => (await q('SELECT DISTINCT unnest(tags) AS t FROM projects')).rows.map((r) => r.t),
   };
 
+  // Imagens (já reduzidas pelo navegador, até 450 KB) ficam no banco; o conteúdo é imutável e servido com cache longo.
+  const images = {
+    add: (img) => q('INSERT INTO images (id, owner_id, mime, data, created_at) VALUES ($1::uuid,$2::uuid,$3,$4,$5)', [img.id, img.ownerId, img.mime, img.data, img.createdAt]),
+    find: async (id) => (await q('SELECT id::text AS id, mime, data FROM images WHERE id = $1::uuid', [id])).rows[0],
+    meta: async (id) => (await q('SELECT id::text AS id, owner_id::text AS "ownerId" FROM images WHERE id = $1::uuid', [id])).rows[0],
+    remove: (id) => q('DELETE FROM images WHERE id = $1::uuid', [id]),
+  };
+
   return {
-    users, projects,
+    users, projects, images,
     init: () => q(SCHEMA),
-    reset: () => q('TRUNCATE project_likes, project_authors, projects, users'),
+    reset: () => q('TRUNCATE images, project_likes, project_authors, projects, users'),
     ping: () => q('SELECT 1'),
     close: () => pool.end(),
   };

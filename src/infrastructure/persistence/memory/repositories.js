@@ -2,7 +2,7 @@ import { ConflictError } from '../../../domain/errors.js';
 
 /** Adaptador em memória (desenvolvimento e testes). Mesma interface do adaptador Postgres. */
 export function createMemoryPersistence() {
-  const state = { users: [], projects: [] };
+  const state = { users: [], projects: [], images: new Map() };
   const users = {
     all: async () => state.users,
     count: async () => state.users.length,
@@ -10,19 +10,22 @@ export function createMemoryPersistence() {
     findByIds: async (ids) => state.users.filter((u) => ids.includes(u.id)),
     findByEmail: async (email) => state.users.find((u) => u.email === email),
     findBySlug: async (slug) => state.users.find((u) => u.slug === slug),
+    slugExists: async (slug) => state.users.some((u) => u.slug === slug),
     async add(user) {
       if (state.users.some((u) => u.email === user.email)) throw new ConflictError('Este e-mail já está cadastrado.');
       state.users.push(user);
     },
-    update: async () => {},
+    update: async () => {}, // os objetos já são mutados no lugar
     allSkills: async () => state.users.flatMap((u) => u.skills),
   };
   const projects = {
     all: async () => state.projects,
     count: async () => state.projects.length,
     findBySlug: async (slug) => state.projects.find((p) => p.slug === slug),
+    slugExists: async (slug) => state.projects.some((p) => p.slug === slug),
     findByAuthor: async (userId) => state.projects.filter((p) => p.authorIds.includes(userId)),
     add: async (project) => { state.projects.push(project); },
+    update: async () => {},
     remove: async (id) => { state.projects = state.projects.filter((p) => p.id !== id); },
     async toggleLike(id, userId) {
       const p = state.projects.find((x) => x.id === id), i = p.likes.indexOf(userId);
@@ -35,5 +38,17 @@ export function createMemoryPersistence() {
     },
     allTags: async () => state.projects.flatMap((p) => p.tags),
   };
-  return { users, projects, init: async () => {}, reset: async () => { state.users = []; state.projects = []; }, ping: async () => true, close: async () => {} };
+  const images = {
+    add: async (image) => { state.images.set(image.id, image); },
+    find: async (id) => state.images.get(id),
+    meta: async (id) => { const image = state.images.get(id); return image && { id: image.id, ownerId: image.ownerId }; },
+    remove: async (id) => { state.images.delete(id); },
+  };
+  return {
+    users, projects, images,
+    init: async () => {},
+    reset: async () => { state.users = []; state.projects = []; state.images.clear(); },
+    ping: async () => true,
+    close: async () => {},
+  };
 }

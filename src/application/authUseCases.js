@@ -1,5 +1,6 @@
 import { ConflictError, UnauthorizedError } from '../domain/errors.js';
 import { buildUser, parseRegistration, toSelf } from '../domain/user.js';
+import { uniqueSlugAsync } from '../domain/shared.js';
 
 export function createAuthUseCases({ users, hasher, tokens }) {
   const session = (user) => ({ token: tokens.sign(user.id), user: toSelf(user) });
@@ -7,8 +8,8 @@ export function createAuthUseCases({ users, hasher, tokens }) {
     async register(input) {
       const data = parseRegistration(input);
       if (await users.findByEmail(data.email)) throw new ConflictError('Este e-mail já está cadastrado.');
-      const taken = new Set((await users.all()).map((u) => u.slug));
-      const user = buildUser({ input: data, passwordHash: hasher.hash(data.password), slugExists: (s) => taken.has(s) });
+      const slug = await uniqueSlugAsync(data.name, (s) => users.slugExists(s));
+      const user = buildUser({ input: data, passwordHash: hasher.hash(data.password), slug });
       await users.add(user);
       return session(user);
     },

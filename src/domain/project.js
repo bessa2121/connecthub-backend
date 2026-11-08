@@ -1,12 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { ValidationError } from './errors.js';
-import { COURSES, YEARS, clean, splitList, uniqueSlug } from './shared.js';
+import { COURSES, YEARS, clean, splitList, imageIdOf } from './shared.js';
 
-export function parseProject(input) {
+/** "current" (opcional) preserva a imagem quando o cliente não envia o campo — útil na edição. */
+export function parseProject(input, current = {}) {
   const data = {
     title: clean(input.title), subtitle: clean(input.subtitle), summary: clean(input.summary),
     description: clean(input.description), course: clean(input.course), year: clean(input.year),
     tags: splitList(input.tags, 8), link: clean(input.link),
+    image: clean(input.image === undefined ? current.image : input.image),
   };
   const errors = {};
   if (data.title.length < 3 || data.title.length > 80) errors.title = 'O título precisa ter de 3 a 80 caracteres.';
@@ -15,14 +17,15 @@ export function parseProject(input) {
   if (data.description.length > 4000) errors.description = 'Máximo de 4000 caracteres.';
   if (!COURSES.includes(data.course)) errors.course = 'Selecione o curso.';
   if (!YEARS.includes(data.year)) errors.year = 'Selecione o ano.';
-  if (data.link && !/^https?:\/\/\S+$/i.test(data.link)) errors.link = 'Use um link começando com http:// ou https://';
+  if (data.link && (data.link.length > 500 || !/^https?:\/\/\S+$/i.test(data.link))) errors.link = 'Use um link começando com http:// ou https://';
+  if (data.image && !imageIdOf(data.image)) errors.image = 'Imagem inválida.';
   if (Object.keys(errors).length) throw new ValidationError('Verifique os campos.', errors);
   return data;
 }
 
-export function buildProject({ input, authorId, slugExists }) {
+export function buildProject({ input, authorId, slug }) {
   return {
-    id: randomUUID(), slug: uniqueSlug(input.title, slugExists), ...input,
+    id: randomUUID(), slug, ...input,
     authorIds: [authorId], likes: [], featured: false,
     hue: Math.floor(Math.random() * 360), createdAt: new Date().toISOString(),
   };

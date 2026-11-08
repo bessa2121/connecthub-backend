@@ -1,9 +1,10 @@
 export class Router {
   routes = [];
-  add(method, path, handler, { auth = false } = {}) {
+  /** options: auth (exige login) e bodyLimit (bytes aceitos no corpo; padrão 100 KB). */
+  add(method, path, handler, { auth = false, bodyLimit } = {}) {
     const keys = [];
     const re = new RegExp(`^${path.replace(/:(\w+)/g, (_, k) => { keys.push(k); return '([^/]+)'; })}/?$`);
-    this.routes.push({ method, re, keys, handler, auth });
+    this.routes.push({ method, re, keys, handler, auth, bodyLimit });
     return this;
   }
   match(method, pathname) {
@@ -16,3 +17,4 @@ export class Router {
   }
 }
 export const reply = (status, body) => ({ __reply: true, status, body });
+export const binary = ({ mime, data, etag }) => ({ __binary: true, mime, data, etag });

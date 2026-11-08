@@ -3,7 +3,7 @@ import { parseProfile, toPublicUser, toSelf } from '../domain/user.js';
 import { COURSES, YEARS } from '../domain/shared.js';
 import { createProjectViewer } from './projectView.js';
 
-export function createCommunityUseCases({ users, projects }) {
+export function createCommunityUseCases({ users, projects, imageGuard }) {
   const hydrate = createProjectViewer({ users });
   const uniq = (list) => [...new Set(list)].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   return {
@@ -20,13 +20,18 @@ export function createCommunityUseCases({ users, projects }) {
     async get(slug) {
       const user = await users.findBySlug(slug);
       if (!user) throw new NotFoundError('Membro não encontrado.');
-      const authored = (await hydrate(await projects.findByAuthor(user.id))).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      const authored = (await hydrate(await projects.findByAuthor(user.id), undefined, { brief: true }))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       return { ...toPublicUser(user), projects: authored };
     },
     async updateProfile(userId, body) {
       const user = await users.findById(userId);
-      Object.assign(user, parseProfile(body));
+      const data = parseProfile(body, user);
+      await imageGuard.check(data.avatar, userId, user.avatar, 'avatar');
+      const previousAvatar = user.avatar;
+      Object.assign(user, data);
       await users.update(user);
+      await imageGuard.discard(previousAvatar, data.avatar);
       return toSelf(user);
     },
     async meta() {

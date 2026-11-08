@@ -7,16 +7,19 @@ import { createTokenService } from './infrastructure/tokenService.js';
 import { createAuthUseCases } from './application/authUseCases.js';
 import { createProjectUseCases } from './application/projectUseCases.js';
 import { createCommunityUseCases } from './application/communityUseCases.js';
+import { createImageGuard, createImageUseCases } from './application/imageUseCases.js';
 import { buildRoutes } from './presentation/http/routes.js';
 import { createServer } from './presentation/http/server.js';
 
 export function createApp({ persistence, secret = config.secret, allowedOrigins = config.allowedOrigins }) {
-  const { users, projects } = persistence;
+  const { users, projects, images } = persistence;
+  const imageGuard = createImageGuard({ images });
   const tokens = createTokenService(secret);
   const router = buildRoutes({
     auth: createAuthUseCases({ users, hasher: passwordHasher, tokens }),
-    projects: createProjectUseCases({ projects, users }),
-    community: createCommunityUseCases({ users, projects }),
+    projects: createProjectUseCases({ projects, users, imageGuard }),
+    community: createCommunityUseCases({ users, projects, imageGuard }),
+    images: createImageUseCases({ images }),
     ping: persistence.ping,
   });
   const authenticate = async (req) => {
