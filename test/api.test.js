@@ -1,19 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createPersistence } from '../src/infrastructure/persistence/index.js';
-import { seedDemo } from '../src/infrastructure/seed.js';
-import { createApp } from '../src/main.js';
+import { createHarness } from './helpers.js';
 
 // Roda a mesma suíte em memória e, se TEST_DATABASE_URL existir, também em PostgreSQL.
-const persistence = createPersistence(process.env.TEST_DATABASE_URL);
-await persistence.init(); await persistence.reset(); await seedDemo(persistence);
-const server = createApp({ persistence, secret: 'test', allowedOrigins: ['https://site.exemplo.com'] }).listen(0);
-const base = `http://localhost:${server.address().port}`;
-const call = async (path, { method = 'GET', body, token, headers = {} } = {}) => {
-  const res = await fetch(base + path, { method, body: body && JSON.stringify(body), headers: { 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }), ...headers } });
-  return { status: res.status, headers: res.headers, data: res.status === 204 ? null : await res.json().catch(() => null) };
-};
-test.after(async () => { server.close(); await persistence.close(); });
+const h = await createHarness();
+const { call, base, signup } = h;
+test.after(h.close);
 
 test('health e raiz', async () => {
   assert.equal((await call('/api/health')).data.status, 'ok');
@@ -52,10 +44,7 @@ test('comunidade, talentos e meta', async () => {
 });
 
 test('fluxo: cadastro, publicar, curtir, perfil e excluir', async () => {
-  const reg = await call('/api/auth/register', { method: 'POST', body: { name: 'Aluno Teste', email: 'teste@x.com', password: '12345678', course: 'Nutrição', year: '1º ano', skills: 'Saúde' } });
-  assert.equal(reg.status, 201);
-  assert.equal((await call('/api/auth/register', { method: 'POST', body: { name: 'Outro', email: 'teste@x.com', password: '12345678', course: 'Nutrição', year: '1º ano' } })).status, 409);
-  const token = reg.data.token;
+  const token = await signup('Aluno Teste', 'teste@x.com');
   assert.equal((await call('/api/auth/me', { token })).data.email, 'teste@x.com');
   assert.equal((await call('/api/projects', { method: 'POST', body: { title: 'x' }, token })).status, 400);
   const pub = await call('/api/projects', { method: 'POST', token, body: { title: 'Cardápio Escolar', summary: 'Cardápio equilibrado para a cantina.', course: 'Nutrição', year: '1º ano', tags: 'Saúde, Nutrição' } });
@@ -79,7 +68,6 @@ test('login: credenciais do seed e senha errada', async () => {
 
 // ---------- v1.1: edição, contatos, fotos e desempenho ----------
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-const signup = async (name, email) => (await call('/api/auth/register', { method: 'POST', body: { name, email, password: '12345678', course: 'Marketing', year: '2º ano' } })).data.token;
 const upload = (token, data = PNG) => call('/api/images', { method: 'POST', token, body: { data } });
 const profileBody = (extra = {}) => ({ bio: '', skills: '', course: 'Marketing', year: '2º ano', ...extra });
 

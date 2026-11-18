@@ -3,6 +3,9 @@ import { parseProfile, toPublicUser, toSelf } from '../domain/user.js';
 import { COURSES, YEARS } from '../domain/shared.js';
 import { createProjectViewer } from './projectView.js';
 
+// Administradores e contas suspensas não aparecem no diretório público.
+const isListed = (u) => u.role !== 'ADMIN' && u.status !== 'SUSPENDED';
+
 export function createCommunityUseCases({ users, projects, imageGuard }) {
   const hydrate = createProjectViewer({ users });
   const uniq = (list) => [...new Set(list)].sort((a, b) => a.localeCompare(b, 'pt-BR'));
@@ -10,7 +13,7 @@ export function createCommunityUseCases({ users, projects, imageGuard }) {
     async list({ q = '', course = '', skill = '' } = {}) {
       const term = q.trim().toLowerCase();
       const counts = await projects.countsByAuthor();
-      return (await users.all()).map(toPublicUser)
+      return (await users.all()).filter(isListed).map(toPublicUser)
         .filter((u) => !course || u.course === course)
         .filter((u) => !skill || u.skills.includes(skill))
         .filter((u) => !term || [u.name, u.course, u.bio, ...u.skills].join(' ').toLowerCase().includes(term))
@@ -19,7 +22,7 @@ export function createCommunityUseCases({ users, projects, imageGuard }) {
     },
     async get(slug) {
       const user = await users.findBySlug(slug);
-      if (!user) throw new NotFoundError('Membro não encontrado.');
+      if (!user || !isListed(user)) throw new NotFoundError('Membro não encontrado.');
       const authored = (await hydrate(await projects.findByAuthor(user.id), undefined, { brief: true }))
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       return { ...toPublicUser(user), projects: authored };

@@ -66,10 +66,12 @@ export function buildUser({ input, passwordHash, slug }) {
     id: randomUUID(), slug, name: input.name, email: input.email,
     passwordHash, course: input.course, year: input.year, bio: '', skills: input.skills,
     avatar: '', instagram: '', linkedin: '', contactEmail: '',
-    createdAt: new Date().toISOString(),
+    role: 'STUDENT', status: 'ACTIVE', createdAt: new Date().toISOString(),
   };
 }
 
 export const toSelf = ({ passwordHash, ...user }) => user;
 // O e-mail de login nunca é público; "contactEmail" só existe se o aluno optar por divulgá-lo.
-export const toPublicUser = ({ passwordHash, email, ...user }) => user;
+export const toPublicUser = ({ passwordHash, email, role, status, ...user }) => user;
+/** Visão do painel administrativo: nunca inclui o hash da senha. */
+export const toAdminUser = ({ passwordHash, bio, skills, avatar, instagram, linkedin, contactEmail, ...user }) => user;

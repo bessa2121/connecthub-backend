@@ -2,7 +2,8 @@ import http from 'node:http';
 import zlib from 'node:zlib';
 import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
-import { AppError } from '../../domain/errors.js';
+import { AppError, ForbiddenError } from '../../domain/errors.js';
+import { rateLimiter } from '../../infrastructure/rateLimiter.js';
 
 const gzip = promisify(zlib.gzip);
 const DEFAULT_BODY_LIMIT = 100 * 1024;
@@ -20,22 +21,13 @@ function readJson(req, limit) {
   });
 }
 
-function rateLimiter(limit, windowMs) {
-  const hits = new Map();
-  return (key) => {
-    const now = Date.now(), entry = hits.get(key);
-    if (hits.size > 5000) hits.clear();
-    if (!entry || entry.reset < now) { hits.set(key, { count: 1, reset: now + windowMs }); return true; }
-    return ++entry.count <= limit;
-  };
-}
-
-const clientIp = (req) => String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress).split(',')[0].trim();
+const clientIp = (req) => String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress).split(',').at(-1).trim();
 const weakEtag = (buffer) => `W/"${createHash('sha1').update(buffer).digest('base64url').slice(0, 27)}"`;
 
 export function createServer({ router, authenticate, allowedOrigins = ['*'] }) {
   const allowAuth = rateLimiter(30, 60_000);
   const allowUpload = rateLimiter(20, 60_000);
+  const allowAccessRequest = rateLimiter(10, 10 * 60_000);
 
   function applyCors(req, res) {
     const origin = req.headers.origin;
@@ -43,7 +35,7 @@ export function createServer({ router, authenticate, allowedOrigins = ['*'] }) {
     if (!origin || (!any && !allowedOrigins.includes(origin))) return;
     res.setHeader('Access-Control-Allow-Origin', any ? '*' : origin);
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
     res.setHeader('Access-Control-Max-Age', '86400');
     res.setHeader('Vary', 'Origin');
   }
@@ -87,9 +79,11 @@ export function createServer({ router, authenticate, allowedOrigins = ['*'] }) {
       const matched = router.match(req.method, url.pathname);
       if (!matched) throw new AppError('Rota não encontrada.', 404);
       if (url.pathname.startsWith('/api/auth/') && req.method === 'POST' && !allowAuth(clientIp(req))) throw new AppError('Muitas tentativas. Aguarde um minuto.', 429);
+      if (url.pathname === '/api/access-requests' && req.method === 'POST' && !allowAccessRequest(clientIp(req))) throw new AppError('Muitas solicitações. Tente novamente mais tarde.', 429);
       if (url.pathname === '/api/images' && req.method === 'POST' && !allowUpload(clientIp(req))) throw new AppError('Muitos envios. Aguarde um minuto.', 429);
       const user = await authenticate(req);
       if (matched.route.auth && !user) throw new AppError('Faça login para continuar.', 401);
+      if (matched.route.admin && user.role !== 'ADMIN') throw new ForbiddenError('Acesso restrito à administração.');
       const body = ['POST', 'PUT', 'PATCH'].includes(req.method) ? await readJson(req, matched.route.bodyLimit ?? DEFAULT_BODY_LIMIT) : {};
       const result = await matched.route.handler({ params: matched.params, query: Object.fromEntries(url.searchParams), body, user });
       if (result?.__binary) return sendBinary(result);

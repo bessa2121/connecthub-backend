@@ -1,10 +1,10 @@
 export class Router {
   routes = [];
-  /** options: auth (exige login) e bodyLimit (bytes aceitos no corpo; padrão 100 KB). */
-  add(method, path, handler, { auth = false, bodyLimit } = {}) {
+  /** options: auth (exige login), admin (exige perfil ADMIN) e bodyLimit (bytes aceitos no corpo; padrão 100 KB). */
+  add(method, path, handler, { auth = false, admin = false, bodyLimit } = {}) {
     const keys = [];
     const re = new RegExp(`^${path.replace(/:(\w+)/g, (_, k) => { keys.push(k); return '([^/]+)'; })}/?$`);
-    this.routes.push({ method, re, keys, handler, auth, bodyLimit });
+    this.routes.push({ method, re, keys, handler, auth: auth || admin, admin, bodyLimit });
     return this;
   }
   match(method, pathname) {

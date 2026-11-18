@@ -66,3 +66,7 @@ slugs são checados com uma consulta em vez de carregar todos os registros. Em h
 Mantenha API e banco **na mesma região**.
 
 Deploy: veja **DEPLOY.md**.
+
+
+## Cadastro por autorização e administração
+O cadastro agora exige aprovação prévia de um administrador e confirmação de e-mail. Guia completo, variáveis de ambiente e provisionamento do primeiro admin em [`docs/CADASTRO-E-ADMIN.md`](docs/CADASTRO-E-ADMIN.md).

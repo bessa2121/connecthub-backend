@@ -14,5 +14,9 @@ services:
         sync: false
       - key: ALLOWED_ORIGINS    # URL do front-end (ex.: https://connecthub.vercel.app)
         sync: false
-      - key: SEED_DEMO
-        value: "true"
+      - key: RESEND_API_KEY     # chave da API do Resend (envio do código de confirmação)
+        sync: false
+      - key: EMAIL_FROM         # remetente verificado no Resend
+        sync: false
+      - key: SEED_DEMO          # demo cria contas com senha pública: deixe "false" em produção
+        value: "false"
