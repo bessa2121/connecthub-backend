@@ -46,7 +46,10 @@ test('erro do provedor (4xx/5xx) e falha de rede viram 502 sem vazar o código n
     await assert.rejects(() => s.sendVerificationCode({ to: 'x@y.z', code: '999888', ttlMinutes: 10 }), (e) => (e.status ?? e.statusCode) === 502);
     globalThis.fetch = async () => { throw new Error('rede'); };
     await assert.rejects(() => s.sendVerificationCode({ to: 'x@y.z', code: '999888', ttlMinutes: 10 }), (e) => (e.status ?? e.statusCode) === 502);
+<<<<<<< HEAD
     assert.ok(logs.some((l) => l.includes('401') && l.includes('unauthorized')), 'loga status e code do Brevo');
+=======
+>>>>>>> 2a690c0e21f7ef7c669dbd96add5e62a5a578a6a
     assert.ok(logs.every((l) => !l.includes('999888') && !l.includes('x@y.z')));
   } finally { globalThis.fetch = real; console.error = realErr; }
 });
