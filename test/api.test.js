@@ -105,7 +105,11 @@ test('contatos do perfil: normaliza, valida e nunca expõe o e-mail de login', a
   assert.equal((await call('/api/profile', { method: 'PUT', token, body: profileBody({ instagram: '' }) })).data.instagram, '');
 });
 
+<<<<<<< HEAD
 test('perfil: portfólio normalizado, bio curta + "Sobre" longo e banner só do dono', async () => {
+=======
+test('perfil: portfólio é normalizado e validado, bio aceita até 1000 caracteres e banner é só do dono', async () => {
+>>>>>>> bc34e0d15975f678d2b740c31df1877b77cca2d9
   const [dono, intruso] = [await signup('Dona Banner', 'banner@x.com'), await signup('Intruso Banner', 'intruso-banner@x.com')];
   const put = (token, extra) => call('/api/profile', { method: 'PUT', token, body: profileBody(extra) });
 
@@ -118,6 +122,7 @@ test('perfil: portfólio normalizado, bio curta + "Sobre" longo e banner só do 
   assert.equal((await put(dono, { bio: 'x' })).data.portfolio, 'https://github.com/dona');
   assert.equal((await put(dono, { portfolio: '' })).data.portfolio, '');
 
+<<<<<<< HEAD
   // bio é curta (300); o texto longo vai em "about" (3000) e só aparece no perfil completo
   assert.equal((await put(dono, { bio: 'a'.repeat(300) })).status, 200);
   assert.ok((await put(dono, { bio: 'a'.repeat(301) })).data.details.bio);
@@ -128,6 +133,12 @@ test('perfil: portfólio normalizado, bio curta + "Sobre" longo e banner só do 
   assert.equal((await call('/api/members')).data.find((m) => m.slug === 'dona-banner').about, undefined, 'lista não traz o texto longo');
   assert.equal((await put(dono, { bio: 'só a bio' })).data.about, about, 'cliente antigo não apaga o "Sobre"');
   assert.equal((await put(dono, { about: '' })).data.about, '');
+=======
+  assert.equal((await put(dono, { bio: 'a'.repeat(1000) })).status, 200);
+  const long = await put(dono, { bio: 'a'.repeat(1001) });
+  assert.equal(long.status, 400);
+  assert.ok(long.data.details.bio);
+>>>>>>> bc34e0d15975f678d2b740c31df1877b77cca2d9
 
   const sent = await upload(dono);
   assert.ok((await put(intruso, { banner: sent.data.url })).data.details.banner, 'banner de outra pessoa é recusado');
