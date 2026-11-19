@@ -105,6 +105,34 @@ test('contatos do perfil: normaliza, valida e nunca expõe o e-mail de login', a
   assert.equal((await call('/api/profile', { method: 'PUT', token, body: profileBody({ instagram: '' }) })).data.instagram, '');
 });
 
+test('perfil: portfólio é normalizado e validado, bio aceita até 1000 caracteres e banner é só do dono', async () => {
+  const [dono, intruso] = [await signup('Dona Banner', 'banner@x.com'), await signup('Intruso Banner', 'intruso-banner@x.com')];
+  const put = (token, extra) => call('/api/profile', { method: 'PUT', token, body: profileBody(extra) });
+
+  assert.equal((await put(dono, { portfolio: 'meusite.com.br' })).data.portfolio, 'https://meusite.com.br/');
+  assert.equal((await put(dono, { portfolio: 'https://github.com/dona' })).data.portfolio, 'https://github.com/dona');
+  for (const bad of ['javascript:alert(1)', 'ftp://site.com', 'sem espaço.com', 'localhost', 'https://u:p@site.com', `https://site.com/${'a'.repeat(200)}`]) {
+    assert.ok((await put(dono, { portfolio: bad })).data.details.portfolio, `rejeita ${bad.slice(0, 30)}`);
+  }
+  // clientes antigos não apagam o portfólio; string vazia remove
+  assert.equal((await put(dono, { bio: 'x' })).data.portfolio, 'https://github.com/dona');
+  assert.equal((await put(dono, { portfolio: '' })).data.portfolio, '');
+
+  assert.equal((await put(dono, { bio: 'a'.repeat(1000) })).status, 200);
+  const long = await put(dono, { bio: 'a'.repeat(1001) });
+  assert.equal(long.status, 400);
+  assert.ok(long.data.details.bio);
+
+  const sent = await upload(dono);
+  assert.ok((await put(intruso, { banner: sent.data.url })).data.details.banner, 'banner de outra pessoa é recusado');
+  assert.equal((await put(dono, { banner: sent.data.url })).data.banner, sent.data.url);
+  assert.equal((await call('/api/members/dona-banner')).data.banner, sent.data.url);
+  assert.ok((await put(dono, { banner: 'https://x.com/a.png' })).data.details.banner, 'só referências de imagem da própria API');
+  // trocar ou remover o banner apaga o arquivo antigo
+  assert.equal((await put(dono, { banner: '' })).data.banner, '');
+  assert.equal((await fetch(base + sent.data.url)).status, 404);
+});
+
 test('imagens: valida, serve com cache longo e só aceita as do próprio usuário', async () => {
   const [dono, intruso] = [await signup('Dona Foto', 'dona@x.com'), await signup('Intruso Foto', 'intruso@x.com')];
   assert.equal((await upload(undefined)).status, 401);

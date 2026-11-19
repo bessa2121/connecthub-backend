@@ -4,7 +4,7 @@ import { SCHEMA } from './schema.js';
 import { createPostgresAccess, where } from './access.js';
 
 const USER = `id::text AS id, slug, name, email, password_hash AS "passwordHash", course, year, bio, skills,
-  avatar, instagram, linkedin, contact_email AS "contactEmail", role, status, created_at AS "createdAt"`;
+  avatar, instagram, linkedin, contact_email AS "contactEmail", banner, portfolio, role, status, created_at AS "createdAt"`;
 const PROJECT = `SELECT p.id::text AS id, p.slug, p.title, p.subtitle, p.summary, p.description, p.course, p.year, p.tags, p.link, p.image,
   p.featured, p.hue, p.created_at AS "createdAt",
   COALESCE((SELECT array_agg(a.user_id::text ORDER BY a.position) FROM project_authors a WHERE a.project_id = p.id), '{}'::text[]) AS "authorIds",
@@ -35,14 +35,14 @@ export function createPostgresPersistence(connectionString) {
     slugExists: async (slug) => (await q('SELECT 1 FROM users WHERE slug = $1', [slug])).rowCount > 0,
     async add(u) {
       try {
-        await q(`INSERT INTO users (id, slug, name, email, password_hash, course, year, bio, skills, avatar, instagram, linkedin, contact_email, role, status, created_at)
-                 VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9::text[],$10,$11,$12,$13,$14,$15,$16)`,
+        await q(`INSERT INTO users (id, slug, name, email, password_hash, course, year, bio, skills, avatar, instagram, linkedin, contact_email, banner, portfolio, role, status, created_at)
+                 VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9::text[],$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
           [u.id, u.slug, u.name, u.email, u.passwordHash, u.course, u.year, u.bio, u.skills,
-           u.avatar ?? '', u.instagram ?? '', u.linkedin ?? '', u.contactEmail ?? '', u.role ?? 'STUDENT', u.status ?? 'ACTIVE', u.createdAt]);
+           u.avatar ?? '', u.instagram ?? '', u.linkedin ?? '', u.contactEmail ?? '', u.banner ?? '', u.portfolio ?? '', u.role ?? 'STUDENT', u.status ?? 'ACTIVE', u.createdAt]);
       } catch (e) { if (e.code === '23505') throw new ConflictError('Este e-mail já está cadastrado.'); throw e; }
     },
-    update: (u) => q(`UPDATE users SET bio=$2, skills=$3::text[], course=$4, year=$5, avatar=$6, instagram=$7, linkedin=$8, contact_email=$9
-                      WHERE id=$1::uuid`, [u.id, u.bio, u.skills, u.course, u.year, u.avatar ?? '', u.instagram ?? '', u.linkedin ?? '', u.contactEmail ?? '']),
+    update: (u) => q(`UPDATE users SET bio=$2, skills=$3::text[], course=$4, year=$5, avatar=$6, instagram=$7, linkedin=$8, contact_email=$9, banner=$10, portfolio=$11
+                      WHERE id=$1::uuid`, [u.id, u.bio, u.skills, u.course, u.year, u.avatar ?? '', u.instagram ?? '', u.linkedin ?? '', u.contactEmail ?? '', u.banner ?? '', u.portfolio ?? '']),
     allSkills: async () => (await q('SELECT DISTINCT unnest(skills) AS s FROM users')).rows.map((r) => r.s),
     async list({ status, search, limit, offset }) {
       const { clause, params } = where({ status, search }, 'status', ['name', 'email']);
