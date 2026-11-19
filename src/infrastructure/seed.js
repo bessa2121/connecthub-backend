@@ -8,7 +8,7 @@ export async function seedDemo({ users, projects }) {
   const passwordHash = passwordHasher.hash('connecthub123');
   const mk = (name, course, year, bio, skills) => ({
     id: randomUUID(), slug: slugify(name), name, email: `${slugify(name).split('-')[0]}@exemplo.com`,
-    passwordHash, course, year, bio, skills, avatar: '', instagram: '', linkedin: '', contactEmail: '', role: 'STUDENT', status: 'ACTIVE', createdAt: '2026-05-10T12:00:00.000Z',
+    passwordHash, course, year, bio, skills, avatar: '', instagram: '', linkedin: '', contactEmail: '', banner: '', portfolio: '', about: '', role: 'STUDENT', status: 'ACTIVE', createdAt: '2026-05-10T12:00:00.000Z',
   });
   const [lucas, beatriz, mariana, rafael, joao, ana, camila] = [
     mk('Lucas Almeida', 'Desenvolvimento de Sistemas', '3º ano', 'Apaixonado por interfaces e por resolver problemas reais da escola.', ['React', 'JavaScript', 'Banco de Dados']),

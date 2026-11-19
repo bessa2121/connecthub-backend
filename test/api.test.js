@@ -105,6 +105,40 @@ test('contatos do perfil: normaliza, valida e nunca expõe o e-mail de login', a
   assert.equal((await call('/api/profile', { method: 'PUT', token, body: profileBody({ instagram: '' }) })).data.instagram, '');
 });
 
+test('perfil: portfólio normalizado, bio curta + "Sobre" longo e banner só do dono', async () => {
+  const [dono, intruso] = [await signup('Dona Banner', 'banner@x.com'), await signup('Intruso Banner', 'intruso-banner@x.com')];
+  const put = (token, extra) => call('/api/profile', { method: 'PUT', token, body: profileBody(extra) });
+
+  assert.equal((await put(dono, { portfolio: 'meusite.com.br' })).data.portfolio, 'https://meusite.com.br/');
+  assert.equal((await put(dono, { portfolio: 'https://github.com/dona' })).data.portfolio, 'https://github.com/dona');
+  for (const bad of ['javascript:alert(1)', 'ftp://site.com', 'sem espaço.com', 'localhost', 'https://u:p@site.com', `https://site.com/${'a'.repeat(200)}`]) {
+    assert.ok((await put(dono, { portfolio: bad })).data.details.portfolio, `rejeita ${bad.slice(0, 30)}`);
+  }
+  // clientes antigos não apagam o portfólio; string vazia remove
+  assert.equal((await put(dono, { bio: 'x' })).data.portfolio, 'https://github.com/dona');
+  assert.equal((await put(dono, { portfolio: '' })).data.portfolio, '');
+
+  // bio é curta (300); o texto longo vai em "about" (3000) e só aparece no perfil completo
+  assert.equal((await put(dono, { bio: 'a'.repeat(300) })).status, 200);
+  assert.ok((await put(dono, { bio: 'a'.repeat(301) })).data.details.bio);
+  const about = 'Linha 1\n\n' + 'b'.repeat(2900);
+  assert.equal((await put(dono, { about })).data.about, about);
+  assert.ok((await put(dono, { about: 'c'.repeat(3001) })).data.details.about);
+  assert.equal((await call('/api/members/dona-banner')).data.about, about);
+  assert.equal((await call('/api/members')).data.find((m) => m.slug === 'dona-banner').about, undefined, 'lista não traz o texto longo');
+  assert.equal((await put(dono, { bio: 'só a bio' })).data.about, about, 'cliente antigo não apaga o "Sobre"');
+  assert.equal((await put(dono, { about: '' })).data.about, '');
+
+  const sent = await upload(dono);
+  assert.ok((await put(intruso, { banner: sent.data.url })).data.details.banner, 'banner de outra pessoa é recusado');
+  assert.equal((await put(dono, { banner: sent.data.url })).data.banner, sent.data.url);
+  assert.equal((await call('/api/members/dona-banner')).data.banner, sent.data.url);
+  assert.ok((await put(dono, { banner: 'https://x.com/a.png' })).data.details.banner, 'só referências de imagem da própria API');
+  // trocar ou remover o banner apaga o arquivo antigo
+  assert.equal((await put(dono, { banner: '' })).data.banner, '');
+  assert.equal((await fetch(base + sent.data.url)).status, 404);
+});
+
 test('imagens: valida, serve com cache longo e só aceita as do próprio usuário', async () => {
   const [dono, intruso] = [await signup('Dona Foto', 'dona@x.com'), await signup('Intruso Foto', 'intruso@x.com')];
   assert.equal((await upload(undefined)).status, 401);

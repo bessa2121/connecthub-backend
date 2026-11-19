@@ -29,12 +29,14 @@ Unicidade: 1 solicitação "viva" (PENDING/APPROVED) por e-mail; 1 autorização
 ## Variáveis de ambiente (novas)
 | Variável | Para quê |
 |---|---|
-| `RESEND_API_KEY` | Chave da API do [Resend](https://resend.com). |
-| `EMAIL_FROM` | Remetente de domínio verificado no Resend, ex.: `ConnectHub <nao-responda@seudominio.com.br>`. |
+| `BREVO_API_KEY` | Chave de API (v3) do [Brevo](https://www.brevo.com). |
+| `BREVO_SENDER_EMAIL` | E-mail do remetente, validado no Brevo (Senders, Domains & Dedicated IPs). |
+| `BREVO_SENDER_NAME` | Nome exibido do remetente, ex.: `ConnectHub`. |
+| `EMAIL_FROM` | Alternativa opcional: `ConnectHub <nao-responda@seudominio.com.br>`. Só vale se `BREVO_SENDER_EMAIL` estiver vazio. |
 | `RETENTION_DAYS` | Dias até apagar solicitações rejeitadas/revogadas (padrão 90). |
 
-Sem `RESEND_API_KEY`/`EMAIL_FROM`, `register` e `resend-verification` respondem **503** para todos os e-mails; o sistema nunca finge ter enviado. Para outro provedor (Brevo, SES) crie outro adaptador com `sendVerificationCode({to, code, ttlMinutes})` em `src/infrastructure/emailSender.js`.
-Sandbox do Resend (`onboarding@resend.dev`) só entrega para o e-mail dono da conta Resend: serve para testar, não para alunos.
+Sem `BREVO_API_KEY` e remetente (`BREVO_SENDER_EMAIL` ou `EMAIL_FROM`), `register` e `resend-verification` respondem **503** para todos os e-mails; o sistema nunca finge ter enviado. Para outro provedor (SES, etc.) crie outro adaptador com `sendVerificationCode({to, code, ttlMinutes})` em `src/infrastructure/emailSender.js`.
+No Brevo, o remetente (ou domínio) precisa estar validado e, para boa entrega, o domínio deve ter SPF/DKIM/DMARC configurados; sem isso os e-mails podem cair em spam ou ser recusados.
 
 ## Primeiro administrador
 Nunca por API nem credencial no código. No servidor/terminal com acesso ao banco:
@@ -56,4 +58,4 @@ Suspensão: a conta perde o acesso na hora (token deixa de valer) e some do dire
 npm install && npm test                      # memória
 TEST_DATABASE_URL=postgres://... npm test    # mesma suíte contra PostgreSQL
 ```
-Em dev local (sem Postgres) os dados ficam em memória; para exercitar o cadastro é preciso um admin e e-mail configurado (Resend). Atalho para desenvolvimento: use `DATABASE_URL` + `npm run admin:create`.
+Em dev local (sem Postgres) os dados ficam em memória; para exercitar o cadastro é preciso um admin e e-mail configurado (Brevo). Atalho para desenvolvimento: use `DATABASE_URL` + `npm run admin:create`.

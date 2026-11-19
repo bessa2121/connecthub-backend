@@ -24,6 +24,21 @@ export function parseLinkedin(value) {
   return match ? match[1] : null;
 }
 
+/** Aceita "site.com" ou o link completo e devolve a URL http(s) normalizada ('' = vazio, null = inválido). */
+export function parsePortfolio(value) {
+  const text = clean(value);
+  if (!text) return '';
+  if (text.length > 200 || /\s/.test(text)) return null;
+  try {
+    const url = new URL(/^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`);
+    const ok = ['http:', 'https:'].includes(url.protocol) && url.hostname.includes('.') && !url.username && !url.password;
+    return ok && url.href.length <= 200 ? url.href : null;
+  } catch { return null; }
+}
+
+export const BIO_MAX = 300; // bio: resumo curto, exibido junto ao nome
+export const ABOUT_MAX = 3000; // "Sobre": texto longo, exibido recolhido com "ver mais"
+
 export function parseRegistration(input) {
   const data = {
     name: clean(input.name), email: clean(input.email).toLowerCase(), password: String(input.password ?? ''),
@@ -44,19 +59,24 @@ export function parseProfile(input, current = {}) {
   const keep = (key) => (input[key] === undefined ? current[key] ?? '' : input[key]);
   const instagram = parseInstagram(keep('instagram'));
   const linkedin = parseLinkedin(keep('linkedin'));
+  const portfolio = parsePortfolio(keep('portfolio'));
   const data = {
     bio: clean(input.bio), skills: splitList(input.skills), course: clean(input.course), year: clean(input.year),
     avatar: clean(keep('avatar')), contactEmail: clean(keep('contactEmail')).toLowerCase(),
     instagram: instagram ?? '', linkedin: linkedin ?? '',
+    banner: clean(keep('banner')), portfolio: portfolio ?? '', about: clean(keep('about')),
   };
   const errors = {};
-  if (data.bio.length > 300) errors.bio = 'A bio pode ter até 300 caracteres.';
+  if (data.bio.length > BIO_MAX) errors.bio = `A bio pode ter até ${BIO_MAX} caracteres.`;
   if (!COURSES.includes(data.course)) errors.course = 'Curso inválido.';
   if (!YEARS.includes(data.year)) errors.year = 'Ano inválido.';
   if (instagram === null) errors.instagram = 'Use seu @usuario ou o link do seu perfil.';
   if (linkedin === null) errors.linkedin = 'Use o link do seu perfil (linkedin.com/in/...).';
   if (data.contactEmail && (data.contactEmail.length > 120 || !EMAIL.test(data.contactEmail))) errors.contactEmail = 'E-mail inválido.';
+  if (data.about.length > ABOUT_MAX) errors.about = `O "Sobre" pode ter até ${ABOUT_MAX} caracteres.`;
   if (data.avatar && !imageIdOf(data.avatar)) errors.avatar = 'Imagem inválida.';
+  if (data.banner && !imageIdOf(data.banner)) errors.banner = 'Imagem inválida.';
+  if (portfolio === null) errors.portfolio = 'Use o link do seu site ou portfólio (ex.: https://seusite.com).';
   if (Object.keys(errors).length) throw new ValidationError('Verifique os campos.', errors);
   return data;
 }
@@ -65,13 +85,14 @@ export function buildUser({ input, passwordHash, slug }) {
   return {
     id: randomUUID(), slug, name: input.name, email: input.email,
     passwordHash, course: input.course, year: input.year, bio: '', skills: input.skills,
-    avatar: '', instagram: '', linkedin: '', contactEmail: '',
+    avatar: '', instagram: '', linkedin: '', contactEmail: '', banner: '', portfolio: '', about: '',
     role: 'STUDENT', status: 'ACTIVE', createdAt: new Date().toISOString(),
   };
 }
 
 export const toSelf = ({ passwordHash, ...user }) => user;
 // O e-mail de login nunca é público; "contactEmail" só existe se o aluno optar por divulgá-lo.
-export const toPublicUser = ({ passwordHash, email, role, status, ...user }) => user;
+// "about" (texto longo) só vai no perfil completo (communityUseCases.get), nunca em listas nem nos autores de projetos.
+export const toPublicUser = ({ passwordHash, email, role, status, about, ...user }) => user;
 /** Visão do painel administrativo: nunca inclui o hash da senha. */
-export const toAdminUser = ({ passwordHash, bio, skills, avatar, instagram, linkedin, contactEmail, ...user }) => user;
+export const toAdminUser = ({ passwordHash, bio, skills, avatar, instagram, linkedin, contactEmail, banner, portfolio, about, ...user }) => user;

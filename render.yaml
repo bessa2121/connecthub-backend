@@ -14,9 +14,11 @@ services:
         sync: false
       - key: ALLOWED_ORIGINS    # URL do front-end (ex.: https://connecthub.vercel.app)
         sync: false
-      - key: RESEND_API_KEY     # chave da API do Resend (envio do código de confirmação)
+      - key: BREVO_API_KEY      # chave da API do Brevo (envio do código de confirmação)
         sync: false
-      - key: EMAIL_FROM         # remetente verificado no Resend
+      - key: BREVO_SENDER_EMAIL # e-mail do remetente validado no Brevo
+        sync: false
+      - key: BREVO_SENDER_NAME  # nome exibido (ex.: ConnectHub)
         sync: false
       - key: SEED_DEMO          # demo cria contas com senha pública: deixe "false" em produção
         value: "false"

@@ -25,16 +25,18 @@ export function createCommunityUseCases({ users, projects, imageGuard }) {
       if (!user || !isListed(user)) throw new NotFoundError('Membro não encontrado.');
       const authored = (await hydrate(await projects.findByAuthor(user.id), undefined, { brief: true }))
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-      return { ...toPublicUser(user), projects: authored };
+      return { ...toPublicUser(user), about: user.about ?? '', projects: authored };
     },
     async updateProfile(userId, body) {
       const user = await users.findById(userId);
       const data = parseProfile(body, user);
       await imageGuard.check(data.avatar, userId, user.avatar, 'avatar');
-      const previousAvatar = user.avatar;
+      await imageGuard.check(data.banner, userId, user.banner, 'banner');
+      const [previousAvatar, previousBanner] = [user.avatar, user.banner];
       Object.assign(user, data);
       await users.update(user);
       await imageGuard.discard(previousAvatar, data.avatar);
+      await imageGuard.discard(previousBanner, data.banner);
       return toSelf(user);
     },
     async meta() {
