@@ -38,9 +38,27 @@ git push -u origin main
 5. **Create Web Service**. Quando aparecer *Live*, abra `https://SEU-SERVICO.onrender.com/api/health` → deve responder `{"status":"ok"}`.
    Essa URL (sem barra no final) é o `API_URL` que o front-end vai usar.
 
+### Deploy automático a cada commit
+
+Cada `git push` (ou merge) na branch ligada ao serviço gera um deploy novo, sem precisar abrir o Render.
+O `render.yaml` já traz `autoDeployTrigger: commit`, mas ele só vale se o serviço foi criado por **New → Blueprint**.
+Se você criou por **New → Web Service**, confira no painel: serviço → **Settings → Build & Deploy → Auto-Deploy** → **On Commit**
+(é o padrão em serviço novo).
+
+- **Pular um commit** (ex.: só mexeu no README): inclua `[skip render]` na mensagem. Também valem `[render skip]`, `[skip deploy]` e `[skip cd]`.
+- **Deploy parou de acontecer sozinho?** As causas mais comuns:
+  1. Alguém usou **Manual Deploy → Deploy a specific commit**: isso desliga o auto-deploy do serviço. Volte a **On Commit** em Settings.
+  2. Auto-Deploy está em **After CI Checks Pass**, mas o repositório não tem CI: sem nenhum check, o Render não faz deploy.
+  3. O serviço foi criado a partir de uma URL pública de Git ou de imagem Docker pronta: esses só fazem deploy manual.
+- **Commit quebrado não derruba o site**: se o build ou a inicialização falhar, o Render mantém a última versão que funcionou no ar
+  (veja o erro em **Deploys → Logs**). Para nem tentar publicar commits que reprovam nos testes, use **After CI Checks Pass**
+  com um workflow de CI (GitHub Actions rodando `npm test`).
+- Cada deploy reinicia a API. No plano gratuito, a primeira chamada depois disso pode demorar alguns segundos.
+
 ## 3. Front-end
 
 Siga o `DEPLOY.md` do `connecthub-web` usando o `API_URL` acima.
+(Vercel, Netlify e Cloudflare Pages também publicam sozinhos a cada push na branch principal.)
 
 ## 4. Travar o CORS
 

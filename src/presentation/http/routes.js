@@ -34,6 +34,7 @@ export function buildRoutes({ auth, registration, admin, projects, community, im
   r.add('GET', '/api/projects/:slug', ({ params, user }) => projects.get(params.slug, user?.id));
   r.add('PUT', '/api/projects/:slug', ({ params, body, user }) => projects.update(user.id, params.slug, body), { auth: true });
   r.add('DELETE', '/api/projects/:slug', async ({ params, user }) => { await projects.remove(user.id, params.slug); return reply(204); }, { auth: true });
+  r.add('DELETE', '/api/projects/:slug/authors/me', async ({ params, user }) => { await projects.leave(user.id, params.slug); return reply(204); }, { auth: true });
   r.add('POST', '/api/projects/:slug/like', ({ params, user }) => projects.toggleLike(user.id, params.slug), { auth: true });
 
   r.add('GET', '/api/members', ({ query }) => community.list(query));

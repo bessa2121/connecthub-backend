@@ -87,6 +87,62 @@ test('editar projeto: só autores, endereço estável e validação', async () =
   assert.equal((await call('/api/projects/projeto-editavel', { method: 'PUT', token: autor, body: { ...base, link: 'javascript:alert(1)' } })).data.details.link !== undefined, true);
 });
 
+test('marcar colegas: equipe na publicação, só o dono gerencia e exclui, colega pode sair', async () => {
+  const [dono, colega, novo] = [await signup('Dona Equipe', 'equipe.dona@x.com'), await signup('Colega Marcado', 'equipe.colega@x.com'), await signup('Novo Integrante', 'equipe.novo@x.com')];
+  const idOf = async (token) => (await call('/api/auth/me', { token })).data.id;
+  const [donoId, colegaId, novoId] = [await idOf(dono), await idOf(colega), await idOf(novo)];
+  const body = { title: 'Projeto em Equipe', summary: 'Projeto feito por várias pessoas.', course: 'Marketing', year: '2º ano', tags: 'Equipe' };
+  const put = (token, extra) => call('/api/projects/projeto-em-equipe', { method: 'PUT', token, body: { ...body, ...extra } });
+  const slugs = async () => (await call('/api/projects/projeto-em-equipe')).data.authors.map((a) => a.slug);
+
+  // Publicar marcando um colega: duplicados e o próprio dono na lista são ignorados; o dono continua em primeiro.
+  const pub = await call('/api/projects', { method: 'POST', token: dono, body: { ...body, authors: [colegaId, colegaId.toUpperCase(), donoId] } });
+  assert.equal(pub.status, 201);
+  assert.deepEqual(pub.data.authors.map((a) => a.slug), ['dona-equipe', 'colega-marcado']);
+  assert.equal(pub.data.ownerId, donoId);
+  assert.equal((await call('/api/members/colega-marcado')).data.projects.some((p) => p.slug === 'projeto-em-equipe'), true);
+  assert.equal((await call('/api/members')).data.find((m) => m.slug === 'colega-marcado').projectCount, 1);
+
+  // Lista inválida: id malformado, membro inexistente, administrador, conta suspensa e excesso de autores.
+  const invalid = (authors) => call('/api/projects', { method: 'POST', token: dono, body: { ...body, title: 'Outro Projeto', authors } });
+  assert.ok((await invalid(['nao-e-uuid'])).data.details.authors);
+  assert.ok((await invalid(['2f1c0f0e-0000-4000-8000-000000000000'])).data.details.authors);
+  const adminId = await idOf(await h.makeAdmin('admin2@escola.test'));
+  assert.equal((await invalid([adminId])).status, 400);
+  const sumido = await signup('Conta Suspensa', 'equipe.suspensa@x.com');
+  const sumidoId = await idOf(sumido);
+  assert.equal((await h.admin(`/api/admin/users/${sumidoId}/suspend`, { method: 'PATCH' })).status, 200);
+  assert.equal((await invalid([sumidoId])).status, 400);
+  const demais = Array.from({ length: 10 }, (_, i) => `2f1c0f0e-0000-4000-8000-${String(i).padStart(12, '0')}`);
+  assert.match((await invalid(demais)).data.details.authors, /até 10/);
+  assert.equal((await call('/api/projects/outro-projeto')).status, 404, 'nada é publicado quando a equipe é inválida');
+
+  // Colega marcado edita o conteúdo, mas não a equipe nem exclui.
+  assert.equal((await put(colega, { title: 'Projeto em Equipe', summary: 'Resumo ajustado pelo colega.' })).status, 200);
+  assert.deepEqual(await slugs(), ['dona-equipe', 'colega-marcado'], 'sem o campo authors a equipe não muda');
+  assert.equal((await put(colega, { authors: [] })).status, 403);
+  assert.equal((await call('/api/projects/projeto-em-equipe', { method: 'DELETE', token: colega })).status, 403);
+  assert.equal((await put(novo, {})).status, 403, 'quem não é autor não edita');
+
+  // O dono troca a equipe (aceita texto separado por vírgula); o dono nunca sai da primeira posição.
+  assert.deepEqual((await put(dono, { authors: `${novoId}, ${colegaId}` })).data.authors.map((a) => a.slug), ['dona-equipe', 'novo-integrante', 'colega-marcado']);
+  assert.deepEqual((await put(dono, { authors: [novoId] })).data.authors.map((a) => a.slug), ['dona-equipe', 'novo-integrante']);
+  assert.equal((await call('/api/members/colega-marcado')).data.projects.length, 0, 'quem foi removido deixa de ver o projeto no perfil');
+  assert.deepEqual((await put(dono, { authors: [] })).data.authors.map((a) => a.slug), ['dona-equipe'], 'lista vazia remove todos os colegas');
+  await put(dono, { authors: [novoId, colegaId] });
+
+  // Sair do projeto: o colega pode; o dono não; quem já saiu não é mais autor.
+  assert.equal((await call('/api/projects/projeto-em-equipe/authors/me', { method: 'DELETE', token: dono })).status, 409);
+  assert.equal((await call('/api/projects/projeto-em-equipe/authors/me', { method: 'DELETE' })).status, 401);
+  assert.equal((await call('/api/projects/projeto-em-equipe/authors/me', { method: 'DELETE', token: colega })).status, 204);
+  assert.deepEqual(await slugs(), ['dona-equipe', 'novo-integrante']);
+  assert.equal((await call('/api/projects/projeto-em-equipe/authors/me', { method: 'DELETE', token: colega })).status, 403);
+  assert.equal((await put(colega, {})).status, 403);
+
+  assert.equal((await call('/api/projects/projeto-em-equipe', { method: 'DELETE', token: dono })).status, 204);
+  assert.equal((await call('/api/members/novo-integrante')).data.projects.length, 0);
+});
+
 test('contatos do perfil: normaliza, valida e nunca expõe o e-mail de login', async () => {
   const token = await signup('Aluna Contato', 'contato@x.com');
   const ok = await call('/api/profile', { method: 'PUT', token, body: profileBody({ instagram: '@aluna.contato', linkedin: 'https://www.linkedin.com/in/aluna-contato/', contactEmail: 'Aluna.Contato@Gmail.com' }) });
@@ -105,11 +161,7 @@ test('contatos do perfil: normaliza, valida e nunca expõe o e-mail de login', a
   assert.equal((await call('/api/profile', { method: 'PUT', token, body: profileBody({ instagram: '' }) })).data.instagram, '');
 });
 
-<<<<<<< HEAD
 test('perfil: portfólio normalizado, bio curta + "Sobre" longo e banner só do dono', async () => {
-=======
-test('perfil: portfólio é normalizado e validado, bio aceita até 1000 caracteres e banner é só do dono', async () => {
->>>>>>> bc34e0d15975f678d2b740c31df1877b77cca2d9
   const [dono, intruso] = [await signup('Dona Banner', 'banner@x.com'), await signup('Intruso Banner', 'intruso-banner@x.com')];
   const put = (token, extra) => call('/api/profile', { method: 'PUT', token, body: profileBody(extra) });
 
@@ -122,7 +174,6 @@ test('perfil: portfólio é normalizado e validado, bio aceita até 1000 caracte
   assert.equal((await put(dono, { bio: 'x' })).data.portfolio, 'https://github.com/dona');
   assert.equal((await put(dono, { portfolio: '' })).data.portfolio, '');
 
-<<<<<<< HEAD
   // bio é curta (300); o texto longo vai em "about" (3000) e só aparece no perfil completo
   assert.equal((await put(dono, { bio: 'a'.repeat(300) })).status, 200);
   assert.ok((await put(dono, { bio: 'a'.repeat(301) })).data.details.bio);
@@ -133,12 +184,6 @@ test('perfil: portfólio é normalizado e validado, bio aceita até 1000 caracte
   assert.equal((await call('/api/members')).data.find((m) => m.slug === 'dona-banner').about, undefined, 'lista não traz o texto longo');
   assert.equal((await put(dono, { bio: 'só a bio' })).data.about, about, 'cliente antigo não apaga o "Sobre"');
   assert.equal((await put(dono, { about: '' })).data.about, '');
-=======
-  assert.equal((await put(dono, { bio: 'a'.repeat(1000) })).status, 200);
-  const long = await put(dono, { bio: 'a'.repeat(1001) });
-  assert.equal(long.status, 400);
-  assert.ok(long.data.details.bio);
->>>>>>> bc34e0d15975f678d2b740c31df1877b77cca2d9
 
   const sent = await upload(dono);
   assert.ok((await put(intruso, { banner: sent.data.url })).data.details.banner, 'banner de outra pessoa é recusado');

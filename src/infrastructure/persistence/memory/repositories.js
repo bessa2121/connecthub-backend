@@ -36,6 +36,7 @@ export function createMemoryPersistence() {
     add: async (project) => { state.projects.push(project); },
     update: async () => {},
     remove: async (id) => { state.projects = state.projects.filter((p) => p.id !== id); },
+    setAuthors: async (id, authorIds) => { const p = state.projects.find((x) => x.id === id); if (p) p.authorIds = [...authorIds]; },
     async toggleLike(id, userId) {
       const p = state.projects.find((x) => x.id === id), i = p.likes.indexOf(userId);
       if (i >= 0) p.likes.splice(i, 1); else p.likes.push(userId);

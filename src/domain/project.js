@@ -23,10 +23,26 @@ export function parseProject(input, current = {}) {
   return data;
 }
 
-export function buildProject({ input, authorId, slug }) {
+export const MAX_AUTHORS = 10; // quem publicou + até 9 colegas marcados
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Colegas marcados no projeto: array de ids ou texto "id1,id2". Devolve `undefined` quando o cliente não enviou o campo
+ * (na edição, isso significa "não mexa na equipe"). Quem publicou não precisa constar: ele sempre é o primeiro autor.
+ */
+export function parseCoAuthorIds(value) {
+  if (value === undefined) return undefined;
+  const items = Array.isArray(value) ? value : String(value ?? '').split(',');
+  const ids = [...new Set(items.map((s) => String(s).trim().toLowerCase()).filter(Boolean))];
+  if (ids.some((id) => !UUID.test(id))) throw new ValidationError('Verifique os campos.', { authors: 'Membro inválido na lista de autores.' });
+  return ids;
+}
+
+/** O primeiro autor é quem publicou ("dono"): só ele exclui o projeto e gerencia a equipe. */
+export function buildProject({ input, authorId, coAuthorIds = [], slug }) {
   return {
     id: randomUUID(), slug, ...input,
-    authorIds: [authorId], likes: [], featured: false,
+    authorIds: [authorId, ...coAuthorIds], likes: [], featured: false,
     hue: Math.floor(Math.random() * 360), createdAt: new Date().toISOString(),
   };
 }

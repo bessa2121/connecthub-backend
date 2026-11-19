@@ -10,6 +10,7 @@ export function createProjectViewer({ users }) {
     const byId = new Map((await users.findByIds(ids)).map((u) => [u.id, u]));
     return list.map(({ authorIds, description, ...p }) => ({
       ...p,
+      ownerId: authorIds[0] ?? null, // quem publicou (primeiro autor)
       ...(brief ? {} : { description }),
       likes: p.likes.length,
       liked: !!viewerId && p.likes.includes(viewerId),

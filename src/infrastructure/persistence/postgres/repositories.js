@@ -4,11 +4,7 @@ import { SCHEMA } from './schema.js';
 import { createPostgresAccess, where } from './access.js';
 
 const USER = `id::text AS id, slug, name, email, password_hash AS "passwordHash", course, year, bio, skills,
-<<<<<<< HEAD
   avatar, instagram, linkedin, contact_email AS "contactEmail", banner, portfolio, about, role, status, created_at AS "createdAt"`;
-=======
-  avatar, instagram, linkedin, contact_email AS "contactEmail", banner, portfolio, role, status, created_at AS "createdAt"`;
->>>>>>> bc34e0d15975f678d2b740c31df1877b77cca2d9
 const PROJECT = `SELECT p.id::text AS id, p.slug, p.title, p.subtitle, p.summary, p.description, p.course, p.year, p.tags, p.link, p.image,
   p.featured, p.hue, p.created_at AS "createdAt",
   COALESCE((SELECT array_agg(a.user_id::text ORDER BY a.position) FROM project_authors a WHERE a.project_id = p.id), '{}'::text[]) AS "authorIds",
@@ -39,7 +35,6 @@ export function createPostgresPersistence(connectionString) {
     slugExists: async (slug) => (await q('SELECT 1 FROM users WHERE slug = $1', [slug])).rowCount > 0,
     async add(u) {
       try {
-<<<<<<< HEAD
         await q(`INSERT INTO users (id, slug, name, email, password_hash, course, year, bio, skills, avatar, instagram, linkedin, contact_email, banner, portfolio, about, role, status, created_at)
                  VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9::text[],$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
           [u.id, u.slug, u.name, u.email, u.passwordHash, u.course, u.year, u.bio, u.skills,
@@ -48,16 +43,6 @@ export function createPostgresPersistence(connectionString) {
     },
     update: (u) => q(`UPDATE users SET bio=$2, skills=$3::text[], course=$4, year=$5, avatar=$6, instagram=$7, linkedin=$8, contact_email=$9, banner=$10, portfolio=$11, about=$12
                       WHERE id=$1::uuid`, [u.id, u.bio, u.skills, u.course, u.year, u.avatar ?? '', u.instagram ?? '', u.linkedin ?? '', u.contactEmail ?? '', u.banner ?? '', u.portfolio ?? '', u.about ?? '']),
-=======
-        await q(`INSERT INTO users (id, slug, name, email, password_hash, course, year, bio, skills, avatar, instagram, linkedin, contact_email, banner, portfolio, role, status, created_at)
-                 VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9::text[],$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
-          [u.id, u.slug, u.name, u.email, u.passwordHash, u.course, u.year, u.bio, u.skills,
-           u.avatar ?? '', u.instagram ?? '', u.linkedin ?? '', u.contactEmail ?? '', u.banner ?? '', u.portfolio ?? '', u.role ?? 'STUDENT', u.status ?? 'ACTIVE', u.createdAt]);
-      } catch (e) { if (e.code === '23505') throw new ConflictError('Este e-mail já está cadastrado.'); throw e; }
-    },
-    update: (u) => q(`UPDATE users SET bio=$2, skills=$3::text[], course=$4, year=$5, avatar=$6, instagram=$7, linkedin=$8, contact_email=$9, banner=$10, portfolio=$11
-                      WHERE id=$1::uuid`, [u.id, u.bio, u.skills, u.course, u.year, u.avatar ?? '', u.instagram ?? '', u.linkedin ?? '', u.contactEmail ?? '', u.banner ?? '', u.portfolio ?? '']),
->>>>>>> bc34e0d15975f678d2b740c31df1877b77cca2d9
     allSkills: async () => (await q('SELECT DISTINCT unnest(skills) AS s FROM users')).rows.map((r) => r.s),
     async list({ status, search, limit, offset }) {
       const { clause, params } = where({ status, search }, 'status', ['name', 'email']);
@@ -94,6 +79,12 @@ export function createPostgresPersistence(connectionString) {
     update: (p) => q(`UPDATE projects SET title=$2, subtitle=$3, summary=$4, description=$5, course=$6, year=$7, tags=$8::text[], link=$9, image=$10
                       WHERE id=$1::uuid`, [p.id, p.title, p.subtitle, p.summary, p.description, p.course, p.year, p.tags, p.link, p.image ?? '']),
     remove: (id) => q('DELETE FROM projects WHERE id = $1::uuid', [id]),
+    /** Substitui a equipe inteira (a ordem define `position`; o primeiro é o dono). */
+    setAuthors: (id, authorIds) => tx(async (c) => {
+      await c.query('DELETE FROM project_authors WHERE project_id = $1::uuid', [id]);
+      for (const [i, userId] of authorIds.entries())
+        await c.query('INSERT INTO project_authors (project_id, user_id, position) VALUES ($1::uuid,$2::uuid,$3)', [id, userId, i]);
+    }),
     async toggleLike(id, userId) {
       const del = await q('DELETE FROM project_likes WHERE project_id=$1::uuid AND user_id=$2::uuid', [id, userId]);
       if (!del.rowCount) await q('INSERT INTO project_likes (project_id, user_id) VALUES ($1::uuid,$2::uuid) ON CONFLICT DO NOTHING', [id, userId]);

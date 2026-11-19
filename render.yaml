@@ -4,6 +4,9 @@ services:
     name: connecthub-api
     runtime: docker
     plan: free
+    # Cada commit na branch ligada ao serviço (push ou merge) gera um novo deploy automaticamente.
+    # Para pular um commit específico, escreva [skip render] na mensagem. Para só publicar quando o CI passar: checksPass.
+    autoDeployTrigger: commit
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
