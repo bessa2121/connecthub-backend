@@ -36,12 +36,8 @@ export function parsePortfolio(value) {
   } catch { return null; }
 }
 
-<<<<<<< HEAD
 export const BIO_MAX = 300; // bio: resumo curto, exibido junto ao nome
 export const ABOUT_MAX = 3000; // "Sobre": texto longo, exibido recolhido com "ver mais"
-=======
-export const BIO_MAX = 1000;
->>>>>>> bc34e0d15975f678d2b740c31df1877b77cca2d9
 
 export function parseRegistration(input) {
   const data = {
@@ -68,11 +64,7 @@ export function parseProfile(input, current = {}) {
     bio: clean(input.bio), skills: splitList(input.skills), course: clean(input.course), year: clean(input.year),
     avatar: clean(keep('avatar')), contactEmail: clean(keep('contactEmail')).toLowerCase(),
     instagram: instagram ?? '', linkedin: linkedin ?? '',
-<<<<<<< HEAD
     banner: clean(keep('banner')), portfolio: portfolio ?? '', about: clean(keep('about')),
-=======
-    banner: clean(keep('banner')), portfolio: portfolio ?? '',
->>>>>>> bc34e0d15975f678d2b740c31df1877b77cca2d9
   };
   const errors = {};
   if (data.bio.length > BIO_MAX) errors.bio = `A bio pode ter até ${BIO_MAX} caracteres.`;
@@ -93,11 +85,7 @@ export function buildUser({ input, passwordHash, slug }) {
   return {
     id: randomUUID(), slug, name: input.name, email: input.email,
     passwordHash, course: input.course, year: input.year, bio: '', skills: input.skills,
-<<<<<<< HEAD
     avatar: '', instagram: '', linkedin: '', contactEmail: '', banner: '', portfolio: '', about: '',
-=======
-    avatar: '', instagram: '', linkedin: '', contactEmail: '', banner: '', portfolio: '',
->>>>>>> bc34e0d15975f678d2b740c31df1877b77cca2d9
     role: 'STUDENT', status: 'ACTIVE', createdAt: new Date().toISOString(),
   };
 }
@@ -107,8 +95,4 @@ export const toSelf = ({ passwordHash, ...user }) => user;
 // "about" (texto longo) só vai no perfil completo (communityUseCases.get), nunca em listas nem nos autores de projetos.
 export const toPublicUser = ({ passwordHash, email, role, status, about, ...user }) => user;
 /** Visão do painel administrativo: nunca inclui o hash da senha. */
-<<<<<<< HEAD
 export const toAdminUser = ({ passwordHash, bio, skills, avatar, instagram, linkedin, contactEmail, banner, portfolio, about, ...user }) => user;
-=======
-export const toAdminUser = ({ passwordHash, bio, skills, avatar, instagram, linkedin, contactEmail, banner, portfolio, ...user }) => user;
->>>>>>> bc34e0d15975f678d2b740c31df1877b77cca2d9

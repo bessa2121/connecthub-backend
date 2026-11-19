@@ -95,15 +95,9 @@ export function createPostgresAccess({ q, many, one, tx }) {
       if (a.status !== STATUS.APPROVED) throw new ConflictError('Esta autorização já foi utilizada.');
       const next = transition(a.status, 'use');
       try {
-<<<<<<< HEAD
         await c.query(`INSERT INTO users (id, slug, name, email, password_hash, course, year, bio, skills, avatar, instagram, linkedin, contact_email, banner, portfolio, about, role, status, created_at)
                        VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9::text[],$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
           [u.id, u.slug, u.name, u.email, u.passwordHash, u.course, u.year, u.bio, u.skills, u.avatar ?? '', u.instagram ?? '', u.linkedin ?? '', u.contactEmail ?? '', u.banner ?? '', u.portfolio ?? '', u.about ?? '', u.role ?? 'STUDENT', u.status ?? 'ACTIVE', u.createdAt]);
-=======
-        await c.query(`INSERT INTO users (id, slug, name, email, password_hash, course, year, bio, skills, avatar, instagram, linkedin, contact_email, banner, portfolio, role, status, created_at)
-                       VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9::text[],$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
-          [u.id, u.slug, u.name, u.email, u.passwordHash, u.course, u.year, u.bio, u.skills, u.avatar ?? '', u.instagram ?? '', u.linkedin ?? '', u.contactEmail ?? '', u.banner ?? '', u.portfolio ?? '', u.role ?? 'STUDENT', u.status ?? 'ACTIVE', u.createdAt]);
->>>>>>> bc34e0d15975f678d2b740c31df1877b77cca2d9
       } catch (e) { if (e.code === '23505') throw new ConflictError('Não foi possível concluir o cadastro. Tente novamente.'); throw e; }
       await c.query('UPDATE registration_authorizations SET status=$2, used_at=$3, used_by=$4::uuid WHERE id=$1::uuid', [a.id, next, now, u.id]);
       await c.query("UPDATE registration_requests SET status='USED' WHERE id=$1::uuid", [a.request_id]);
